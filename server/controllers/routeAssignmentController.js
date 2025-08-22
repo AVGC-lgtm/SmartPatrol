@@ -361,7 +361,12 @@ exports.getAssignmentsByPoliceStation = async (req, res) => {
           ...assignment.toJSON(),
           user: user ? {
             id: user.id,
-            username: user.username || `User_${user.id}`
+            username: user.username || `User_${user.id}`,
+            // Add only the 4 specific fields
+            smartusername: user.smartusername,
+            smartuseremail: user.smartuseremail,
+            smartuserphone: user.smartuserphone,
+            smartuserrank: user.smartuserrank
           } : null,
           route: route ? {
             id: route.id,
@@ -419,7 +424,6 @@ exports.getAssignmentsByPoliceStation = async (req, res) => {
     });
   }
 };
-
 // Get Assignment by ID
 exports.getAssignmentById = async (req, res) => {
   try {

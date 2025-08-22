@@ -91,7 +91,7 @@ exports.createCheckpoint = async (req, res) => {
       lat_long: lat_long,
       address,
       policeStationId: Number(policeStationId),
-      scanRadius: 500, // Default 500 meters
+      scanRadius: 100, // Default 100 meters
       qrCode: qrCodeId,
       qrCodeUrl,
     });
@@ -426,112 +426,6 @@ exports.getCheckpointQRCode = async (req, res) => {
   }
 };
 
-// Download QR Code as PNG/SVG
-// exports.downloadCheckpointQRCode = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { format = 'png', size = 300 } = req.query;
-
-//     // Validate ID
-//     if (!id || isNaN(id)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Invalid checkpoint ID',
-//       });
-//     }
-
-//     // Validate format
-//     if (!['png', 'svg'].includes(format)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Format must be png or svg',
-//       });
-//     }
-
-//     // Validate size
-//     const qrSize = parseInt(size);
-//     if (qrSize < 100 || qrSize > 1000) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Size must be between 100 and 1000 pixels',
-//       });
-//     }
-
-//     const checkpoint = await Checkpoint.findByPk(id);
-
-//     if (!checkpoint || !checkpoint.isActive) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Checkpoint not found',
-//       });
-//     }
-
-//     // Create QR code data with lat_long and policeStationId
-//     const qrData = JSON.stringify({
-//       id: checkpoint.qrCode,
-//       name: checkpoint.name,
-//       lat_long: checkpoint.lat_long,
-//       latitude: checkpoint.getLatitude(),
-//       longitude: checkpoint.getLongitude(),
-//       policeStationId: checkpoint.policeStationId,
-//       type: 'checkpoint'
-//     });
-
-//     // Generate filename
-//     const sanitizedName = checkpoint.name.replace(/[^a-zA-Z0-9]/g, '_');
-//     const filename = `checkpoint_${sanitizedName}_QR.${format}`;
-
-//     if (format === 'png') {
-//       // Generate QR code as PNG buffer
-//       const qrBuffer = await QRCode.toBuffer(qrData, {
-//         type: 'png',
-//         width: qrSize,
-//         margin: 2,
-//         color: {
-//           dark: '#000000',
-//           light: '#FFFFFF'
-//         }
-//       });
-
-//       // Set headers for file download
-//       res.setHeader('Content-Type', 'image/png');
-//       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-//       res.setHeader('Content-Length', qrBuffer.length);
-
-//       // Send the buffer
-//       res.send(qrBuffer);
-
-//     } else if (format === 'svg') {
-//       // Generate QR code as SVG
-//       const qrSvg = await QRCode.toString(qrData, {
-//         type: 'svg',
-//         width: qrSize,
-//         margin: 2,
-//         color: {
-//           dark: '#000000',
-//           light: '#FFFFFF'
-//         }
-//       });
-
-//       // Set headers for file download
-//       res.setHeader('Content-Type', 'image/svg+xml');
-//       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-//       // Send the SVG
-//       res.send(qrSvg);
-//     }
-
-//   } catch (error) {
-//     console.error('Download QR code error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Failed to download QR code',
-//       error: error.message,
-//     });
-//   }
-// };
-
-
 // Get Checkpoint Scan History
 exports.getCheckpointScans = async (req, res) => {
   try {
@@ -714,7 +608,7 @@ exports.scanQRCode = async (req, res) => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    const scanRadius = checkpoint.scanRadius || 500;
+    const scanRadius = checkpoint.scanRadius || 100;
     const isWithinRadius = distance <= scanRadius;
 
     if (!isWithinRadius) {
@@ -989,8 +883,6 @@ exports.getCheckpointsByPoliceStation = async (req, res) => {
 
 
 
-
-
 // FIXED BACKEND - ENHANCED FILENAME GENERATION
 exports.downloadCheckpointQRCode = async (req, res) => {
   try {
@@ -1130,26 +1022,20 @@ function sanitizeFilename(text) {
     || 'unnamed';
 }
 
-// ENHANCED ANTI-TEARING QR FUNCTION (same as before but with better logging)
+// FIXED ANTI-TEARING QR FUNCTION - RESOLVED SVG STRUCTURE ISSUES
 async function createAntiTearingQR(qrData, checkpoint, policeStationName, qrSize) {
   try {
     console.log(`🔧 Creating ANTI-TEARING QR layout for: "${checkpoint.name}"`);
     
-    // Generate QR as SVG instead of base64 PNG
-    const qrSvgString = await QRCode.toString(qrData, {
-      type: 'svg',
+    // Generate QR as raw SVG path data instead of full SVG
+    const qrCodeMatrix = await QRCode.create(qrData, {
+      errorCorrectionLevel: 'H',
       width: qrSize,
-      margin: 2,
-      color: { dark: '#000000', light: '#FFFFFF' },
-      errorCorrectionLevel: 'H'
+      margin: 2
     });
 
-    // Extract the QR SVG content
-    const qrSvgContent = qrSvgString
-      .replace(/^<\?xml[^>]*\?>/, '')
-      .replace(/^<svg[^>]*>/, '')
-      .replace(/<\/svg>$/, '')
-      .trim();
+    // Create QR squares manually to avoid SVG nesting issues
+    const qrSvgPaths = generateQRPaths(qrCodeMatrix, qrSize);
 
     // Layout dimensions
     const padding = 50;
@@ -1179,7 +1065,6 @@ async function createAntiTearingQR(qrData, checkpoint, policeStationName, qrSize
      shape-rendering="crispEdges"
      text-rendering="optimizeLegibility">
 
-  <!-- Add CSS for better rendering -->
   <defs>
     <style type="text/css"><![CDATA[
       .crisp-text {
@@ -1190,9 +1075,6 @@ async function createAntiTearingQR(qrData, checkpoint, policeStationName, qrSize
       }
       .qr-container {
         shape-rendering: crispEdges;
-        image-rendering: pixelated;
-        image-rendering: -moz-crisp-edges;
-        image-rendering: crisp-edges;
       }
     ]]></style>
   </defs>
@@ -1262,12 +1144,10 @@ async function createAntiTearingQR(qrData, checkpoint, policeStationName, qrSize
     POLICE
   </text>
 
-  <!-- Embed QR as native SVG instead of image -->
+  <!-- QR Code as native rectangles - FIXED STRUCTURE -->
   <g transform="translate(${(totalWidth - qrSize) / 2}, ${padding + headerHeight + qrSpacing})" 
      class="qr-container">
-    <svg width="${qrSize}" height="${qrSize}" viewBox="0 0 ${qrSize} ${qrSize}">
-      ${qrSvgContent}
-    </svg>
+    ${qrSvgPaths}
   </g>
 
   <!-- Clean separator line -->
@@ -1310,6 +1190,27 @@ async function createAntiTearingQR(qrData, checkpoint, policeStationName, qrSize
   }
 }
 
+// NEW FUNCTION: Generate QR paths manually to avoid SVG nesting issues
+function generateQRPaths(qrMatrix, size) {
+  const modules = qrMatrix.modules;
+  const moduleCount = modules.size;
+  const moduleSize = size / moduleCount;
+  
+  let paths = '';
+  
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (modules.get(row, col)) {
+        const x = col * moduleSize;
+        const y = row * moduleSize;
+        paths += `<rect x="${x}" y="${y}" width="${moduleSize}" height="${moduleSize}" fill="#000000" shape-rendering="crispEdges"/>`;
+      }
+    }
+  }
+  
+  return paths;
+}
+
 // XML text escaping function
 function escapeXmlText(text) {
   if (!text) return '';
@@ -1321,7 +1222,7 @@ function escapeXmlText(text) {
     .replace(/'/g, '&#39;');
 }
 
-// Enhanced police station function
+// FIXED - Enhanced police station function
 async function getPoliceStationNameFromDatabase(policeStationId) {
   try {
     console.log(`🔍 Fetching police station name for ID: ${policeStationId}`);
@@ -1369,20 +1270,24 @@ async function getPoliceStationNameFromDatabase(policeStationId) {
   }
 }
 
-// Enhanced logo function
+// FIXED - Logo loading function with correct path
 function getLogoAsBase64() {
   try {
     const fs = require('fs');
     const path = require('path');
     
-    // Try multiple possible logo paths
+    // Updated paths based on your project structure
     const possiblePaths = [
-      path.join(__dirname, '../../png/logo.png'),
-      path.join(__dirname, '../png/logo.png'),
-      path.join(__dirname, './png/logo.png'),
-      path.join(process.cwd(), 'png/logo.png'),
-      path.join(process.cwd(), 'assets/logo.png')
+      path.join(process.cwd(), 'png/logo.png'),           // Project root
+      path.join(__dirname, '../../png/logo.png'),        // From controllers folder
+      path.join(__dirname, '../../../png/logo.png'),     // One level up
+      path.join(__dirname, './png/logo.png'),            // Same directory
+      path.join(process.cwd(), 'assets/png/logo.png'),   // Assets folder
+      path.join(process.cwd(), 'public/png/logo.png')    // Public folder
     ];
+    
+    console.log('🔍 Searching for logo in paths:');
+    possiblePaths.forEach((p, i) => console.log(`  ${i + 1}. ${p}`));
     
     for (const logoPath of possiblePaths) {
       if (fs.existsSync(logoPath)) {

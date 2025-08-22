@@ -26,7 +26,7 @@ const Checkpoint = sequelize.define('Checkpoint', {
   },
   scanRadius: {
     type: DataTypes.INTEGER,
-    defaultValue: 500,
+    defaultValue: 100,
   },
   qrCode: {
     type: DataTypes.STRING,

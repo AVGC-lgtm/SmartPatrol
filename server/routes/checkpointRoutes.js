@@ -48,7 +48,7 @@ router.delete('/:id', checkpointController.deleteCheckpoint);
 router.get('/:id/qrcode', checkpointController.getCheckpointQRCode);
 
 // Download QR Code as file (includes policeStationId in QR data)
-// router.get('/:id/qrcode/download', checkpointController.downloadCheckpointQRCode);
+router.get('/:id/qrcode/download', checkpointController.downloadCheckpointQRCode);
 
 // Scan QR Code - WITH FILE UPLOAD SUPPORT
 router.post('/scan-qr', 
@@ -56,10 +56,6 @@ router.post('/scan-qr',
   handleUploadError,
   checkpointController.scanQRCode
 );
-
-
-router.get('/:id/qrcode/download', checkpointController.downloadCheckpointQRCode);
-
 
 
 module.exports = router;
