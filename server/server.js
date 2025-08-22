@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors'); // Import cors
-const sequelize = require('./config/database'); // Import the Sequelize instance
+const sequelize = require('./config/database'); // Import the Sequelize instance....
 const { setupAssociations } = require('./models/associations'); // Import associations
 require('dotenv').config();
 
